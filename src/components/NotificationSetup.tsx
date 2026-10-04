@@ -156,7 +156,7 @@ function NotificationSetup() {
                             <div className="flex flex-col gap-3">
                                 <Step
                                     n={1}
-                                    text={<>Message <b>@ChargeGuardBot</b> on Telegram</>}
+                                    text={<>Message <b>@RechargeGuardBot</b> on Telegram</>}
                                 />
                                 <Step
                                     n={2}

@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     // Push: send to every device this user has registered, dropping stale ones.
     for (const sub of item.user.pushSubscriptions) {
       try {
-        await sendPushToSubscription(sub, { title: "Charge Guard", body: message });
+        await sendPushToSubscription(sub, { title: "Recharge Guard", body: message });
       } catch (err) {
         if (err instanceof StaleSubscriptionError) {
           await prisma.pushSubscription.delete({ where: { endpoint: err.endpoint } });

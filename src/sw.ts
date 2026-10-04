@@ -27,7 +27,7 @@ const serwist = new Serwist({
 serwist.addEventListeners();
 
 // Push notifications arrive here regardless of whether the app tab is open —
-// this is what makes "Papa's recharge is due" show up even if Charge Guard isn't open.
+// this is what makes "Papa's recharge is due" show up even if Recharge Guard isn't open.
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 

@@ -21,7 +21,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Charge Guard — recharge reminders",
+  title: "Recharge Guard — recharge reminders",
   description: "Never miss a mobile or broadband recharge for your family.",
   manifest: "/manifest.json",
 };

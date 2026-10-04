@@ -1,4 +1,4 @@
-// ChargeGuard — recharge reminder app
+// RechargeGuard — recharge reminder app
 // Run `npx prisma generate` after cloning, and `npx prisma migrate dev` to create tables.
 
 generator client {

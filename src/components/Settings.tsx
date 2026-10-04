@@ -137,7 +137,7 @@ export function Settings() {
               </button>
             </div>
             <p className="text-xs text-ink-soft mt-2">
-              Message <b>@ChargeGuardBot</b> on Telegram, send <code>/start</code>, and paste the chat ID it replies with.
+              Message <b>@RechargeGuardBot</b> on Telegram, send <code>/start</code>, and paste the chat ID it replies with.
             </p>
           </div>
         </Section>

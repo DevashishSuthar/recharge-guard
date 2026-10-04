@@ -1,4 +1,4 @@
-# ChargeGuard
+# Recharge Guard
 
 Recharge reminders for your family — mobile + broadband, one setup, notified before the due date.
 

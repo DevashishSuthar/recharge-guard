@@ -61,7 +61,7 @@ export function Landing() {
             Nobody&apos;s phone should go dark because you forgot a recharge.
           </h1>
           <p className="text-ink-soft text-base leading-relaxed mt-5 max-w-md">
-            Add your family&apos;s mobile and broadband plans once. Charge Guard
+            Add your family&apos;s mobile and broadband plans once. Recharge Guard
             tracks every due date and pings you on Telegram or your browser a
             few days before anyone&apos;s line runs out.
           </p>
@@ -117,7 +117,7 @@ export function Landing() {
           />
           <Feature
             title="Reminded before it's due"
-            body="Set how many days of lead time you want per plan. Charge Guard checks every day and nudges you before anyone goes offline."
+            body="Set how many days of lead time you want per plan. Recharge Guard checks every day and nudges you before anyone goes offline."
           />
           <Feature
             title="Telegram or push, your call"

@@ -49,8 +49,8 @@ export async function POST(req: Request, { params }: Params) {
   // with no text, a random command) — never leaving the user without a
   // response after they've messaged the bot expecting to be told what to do.
   const text = isStart
-    ? `Welcome to Charge Guard! Your Telegram chat ID is: ${chatId}\n\nPaste this into Settings → Telegram chat ID to start getting recharge reminders here.`
-    : `Your Charge Guard chat ID is: ${chatId}\n\nPaste this into Settings → Telegram chat ID to start getting recharge reminders here. (Send /start any time to see this again.)`;
+    ? `Welcome to Recharge Guard! Your Telegram chat ID is: ${chatId}\n\nPaste this into Settings → Telegram chat ID to start getting recharge reminders here.`
+    : `Your Recharge Guard chat ID is: ${chatId}\n\nPaste this into Settings → Telegram chat ID to start getting recharge reminders here. (Send /start any time to see this again.)`;
 
   const sent = await sendTelegramMessage(chatId, text);
   return sent
