@@ -40,9 +40,6 @@ const rechargeFormSchema = z
       .min(1, "Last recharge date is required")
       .refine((v) => !Number.isNaN(new Date(v).getTime()), {
         message: "Invalid date",
-      })
-      .refine((v) => new Date(v) <= new Date(), {
-        message: "Can't be in the future",
       }),
     leadDays: z.coerce
       .number()
@@ -111,12 +108,9 @@ export function EditModal({
     const expiry = new Date(expiryInput);
     if (Number.isNaN(expiry.getTime())) return;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const computed = addDays(expiry, -cycleDays);
-    const clamped = computed > today ? today : computed;
 
-    setValue("lastRecharge", clamped.toISOString().slice(0, 10), {
+    setValue("lastRecharge", computed.toISOString().slice(0, 10), {
       shouldValidate: true,
       shouldDirty: true,
     });

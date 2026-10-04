@@ -54,7 +54,11 @@ export function RechargeCard({
     // changed. Instead of letting that click silently do nothing, the
     // button swaps to a disabled "Recharged" state so it's clear the click
     // already registered and there's nothing further to do today.
-    const alreadyDoneToday = isToday(item.lastRecharge);
+    // Done now rolls the cycle forward from the due date, so an early recharge
+    // can leave lastRecharge in the future. Block a second Done in that case too,
+    // otherwise a double-click would skip an entire cycle.
+    const alreadyDoneToday =
+        isToday(item.lastRecharge) || new Date(item.lastRecharge) > new Date();
 
     // const { due, daysLeft, status } = dueInfo(item);
 
@@ -120,8 +124,8 @@ export function RechargeCard({
                 <button
                     onClick={onDone}
                     disabled={alreadyDoneToday || marking}
-                    aria-label={alreadyDoneToday ? "Already recharged today" : "Mark as recharged"}
-                    title={alreadyDoneToday ? "Already marked as recharged today" : undefined}
+                    aria-label={alreadyDoneToday ? "Already recharged for this cycle" : "Mark as recharged"}
+                    title={alreadyDoneToday ? "Already recharged for the current cycle" : undefined}
                     className={`mt-1 flex items-center gap-1 text-[10px] font-semibold rounded-md px-2 py-1 transition-colors ${alreadyDoneToday
                         ? "bg-paper-dim text-ink-soft cursor-default"
                         : marking
