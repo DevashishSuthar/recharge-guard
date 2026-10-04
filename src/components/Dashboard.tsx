@@ -78,7 +78,8 @@ export function Dashboard() {
     try {
       const payload = {
         ...data,
-        phone: data.phone || undefined
+        // PATCH needs an explicit null to clear the field; POST just omits it.
+        phone: data.phone || (editingId ? null : undefined),
       };
 
       const res = await fetch(
@@ -104,7 +105,12 @@ export function Dashboard() {
     try {
       const res = await fetch(`/api/recharges/${item.id}/recharge`, { method: "POST" });
       if (res.ok) {
-        showToast(`${item.label} marked as recharged — renews again in ${item.cycleDays} days.`);
+        const updated = await res.json();
+        const nextDue = new Date(updated.due).toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+        });
+        showToast(`${item.label} marked as recharged — next due ${nextDue}.`);
       } else {
         showToast("Couldn't mark that as recharged. Try again.", "error");
       }

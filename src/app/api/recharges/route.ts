@@ -11,13 +11,15 @@ export async function GET() {
 
   const items = await prisma.rechargeItem.findMany({
     where: { userId },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
 
   // Attach computed due/status so the client never has to duplicate this math.
-  const withStatus = items
-    .map((item) => ({ ...item, amount: paiseToRupees(item.amount), ...computeDue(item) }))
-    .sort((a, b) => a.daysLeft - b.daysLeft);
+  const withStatus = items.map((item) => ({
+    ...item,
+    amount: paiseToRupees(item.amount),
+    ...computeDue(item),
+  })); 
 
   return NextResponse.json(withStatus);
 }
