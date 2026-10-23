@@ -18,8 +18,10 @@
   --color-paper: #f6f4ef;
   --color-paper-dim: #edeae1;
   --color-teal: #0e7c7b;
+  /* --color-teal: #0b6e6d; */
   --color-teal-soft: #e4f1f0;
   --color-amber: #c97a2b;
+  /* --color-amber: #9a5a12; */
   --color-amber-soft: #f6e9da;
   --color-rose: #b23a48;
   --color-rose-soft: #f5e1e2;
@@ -34,6 +36,17 @@
   --color-brand: #f97316;
   --color-brand-light: #fb923c;
   --color-brand-soft: #fff1e6;
+
+  /* Darker orange for solid CTA buttons and orange text on light backgrounds.
+    White on --color-brand is only 2.8:1 (WCAG AA needs 4.5:1); white on this
+    is 5.2:1. Use it wherever text sits on / is coloured by the brand orange. */
+  --color-brand-strong: #c2410c;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 body {

@@ -1,50 +1,75 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Plus } from "lucide-react";
-import { EditModal, RechargeFormValues } from "@/components/EditModal";
+import { RechargeModal, RechargeFormValues } from "@/components/RechargeModal";
 import { RechargeCard } from "@/components/RechargeCard";
 import { RechargeCardSkeleton } from "@/components/RechargeCardSkeleton";
-import { enablePushNotifications } from "@/lib/pushClient";
+import { Reminders } from "@/components/Reminders";
 import { useToast } from "@/components/Toast";
+import { DEFAULT_CYCLE_DAYS, DEFAULT_LEAD_DAYS } from "@/lib/constants";
+import { enablePushNotifications } from "@/lib/pushClient";
 import type { RechargeItem } from "@/lib/types";
+import { formatDueDate, todayIstInput, toIstDateInput } from "@/lib/utils";
 
-const emptyValues: RechargeFormValues = {
-  label: "",
-  provider: "",
-  type: "MOBILE",
-  phone: "",
-  amount: 0,
-  cycleDays: 28,
-  lastRecharge: new Date().toISOString().slice(0, 10),
-  leadDays: 3,
-};
+/** Blank form for "Add recharge", pre-filled with the user's default lead time. */
+function makeEmptyValues(leadDays: number): RechargeFormValues {
+  return {
+    label: "",
+    provider: "",
+    type: "MOBILE",
+    phone: "",
+    amount: 0,
+    cycleDays: DEFAULT_CYCLE_DAYS,
+    lastRecharge: todayIstInput(),
+    leadDays,
+  };
+}
+
+async function errorMessage(res: Response, fallback: string) {
+  try {
+    const data = await res.json();
+    return typeof data?.error === "string" ? data.error : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function Dashboard() {
   const { showToast } = useToast();
   const [items, setItems] = useState<RechargeItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [pushDeviceCount, setPushDeviceCount] = useState(0);
   const [telegramConnected, setTelegramConnected] = useState(false);
+  const [defaultLeadDays, setDefaultLeadDays] = useState(DEFAULT_LEAD_DAYS);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [initialValues, setInitialValues] = useState<RechargeFormValues>(emptyValues);
+  const [initialValues, setInitialValues] = useState<RechargeFormValues>(() =>
+    makeEmptyValues(DEFAULT_LEAD_DAYS)
+  );
   const [saving, setSaving] = useState(false);
   const [pushMessage, setPushMessage] = useState<string | null>(null);
   const [markingId, setMarkingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [rechargesRes, meRes] = await Promise.all([
-      fetch("/api/recharges"),
-      fetch("/api/me"),
-    ]);
-    if (rechargesRes.ok) setItems(await rechargesRes.json());
-    if (meRes.ok) {
-      const me = await meRes.json();
-      setPushDeviceCount(me.pushDeviceCount);
-      setTelegramConnected(Boolean(me.telegramChatId));
+    try {
+      const [rechargesRes, meRes] = await Promise.all([fetch("/api/recharges"), fetch("/api/me")]);
+      if (!rechargesRes.ok) throw new Error(String(rechargesRes.status));
+      setItems(await rechargesRes.json());
+      if (meRes.ok) {
+        const me = await meRes.json();
+        setPushDeviceCount(me.pushDeviceCount);
+        setTelegramConnected(Boolean(me.telegramChatId));
+        setDefaultLeadDays(me.defaultLeadDays);
+      }
+      setLoadError(false);
+    } catch {
+      // Without this the skeleton cards stayed on screen forever after a failed fetch.
+      setLoadError(true);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -54,7 +79,7 @@ export function Dashboard() {
 
   function openAdd() {
     setEditingId(null);
-    setInitialValues(emptyValues);
+    setInitialValues(makeEmptyValues(defaultLeadDays));
     setModalOpen(true);
   }
 
@@ -67,7 +92,7 @@ export function Dashboard() {
       phone: item.phone ?? "",
       amount: item.amount,
       cycleDays: item.cycleDays,
-      lastRecharge: item.lastRecharge.slice(0, 10),
+      lastRecharge: toIstDateInput(item.lastRecharge),
       leadDays: item.leadDays,
     });
     setModalOpen(true);
@@ -93,8 +118,13 @@ export function Dashboard() {
 
       if (res.ok) {
         setModalOpen(false);
+        showToast(editingId ? "Recharge updated." : "Recharge added.");
         await load();
+      } else {
+        showToast(await errorMessage(res, "Couldn't save that recharge. Try again."), "error");
       }
+    } catch {
+      showToast("Couldn't reach the server. Check your connection and try again.", "error");
     } finally {
       setSaving(false);
     }
@@ -106,23 +136,31 @@ export function Dashboard() {
       const res = await fetch(`/api/recharges/${item.id}/recharge`, { method: "POST" });
       if (res.ok) {
         const updated = await res.json();
-        const nextDue = new Date(updated.due).toLocaleDateString("en-IN", {
-          day: "2-digit",
-          month: "short",
-        });
-        showToast(`${item.label} marked as recharged — next due ${nextDue}.`);
+        showToast(`${item.label} marked as recharged — next due ${formatDueDate(updated.due)}.`);
       } else {
         showToast("Couldn't mark that as recharged. Try again.", "error");
       }
       await load();
+    } catch {
+      showToast("Couldn't reach the server. Check your connection and try again.", "error");
     } finally {
       setMarkingId(null);
     }
   }
 
-  async function handleDelete(id: string) {
-    await fetch(`/api/recharges/${id}`, { method: "DELETE" });
-    await load();
+  async function handleDelete(item: RechargeItem) {
+    if (!window.confirm(`Delete the ${item.label} recharge?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/recharges/${item.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      showToast(`${item.label} deleted.`);
+      await load();
+    } catch {
+      showToast("Couldn't delete that recharge. Try again.", "error");
+    }
   }
 
   async function handleEnablePush() {
@@ -131,6 +169,8 @@ export function Dashboard() {
     if (result.ok) await load();
   }
 
+  // Most urgent first (overdue → soonest due).
+  const sorted = useMemo(() => [...items].sort((a, b) => a.daysLeft - b.daysLeft), [items]);
   const overdueCount = items.filter((i) => i.status === "overdue").length;
   const soonCount = items.filter((i) => i.status === "soon").length;
   const noChannel = pushDeviceCount === 0 && !telegramConnected;
@@ -142,12 +182,12 @@ export function Dashboard() {
   return (
     <>
       <main className="max-w-shell mx-auto px-4 sm:px-6 pt-6 sm:pt-9 pb-20">
-        {noChannel && !loading && (
+        {noChannel && !loading && !loadError && (
           <div className="mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 bg-amber-soft text-amber text-sm rounded-lg px-4 py-3">
             <span>You won&apos;t get reminded until you enable a notification channel.</span>
             <button
               onClick={handleEnablePush}
-              className="font-semibold underline shrink-0 text-left sm:text-inherit"
+              className="font-semibold underline shrink-0 text-left sm:text-inherit cursor-pointer"
             >
               Enable push
             </button>
@@ -172,9 +212,9 @@ export function Dashboard() {
           </div>
           <button
             onClick={openAdd}
-            className="flex items-center justify-center gap-1.5 bg-brand hover:bg-brand-light transition-colors text-white text-sm font-semibold border-none rounded-lg px-4 py-2.5 cursor-pointer w-full sm:w-auto"
+            className="flex items-center justify-center gap-1.5 bg-brand-strong hover:brightness-110 transition text-white text-sm font-semibold border-none rounded-lg px-4 py-2.5 cursor-pointer w-full sm:w-auto"
           >
-            <Plus size={15} /> Add recharge
+            <Plus size={15} aria-hidden /> Add recharge
           </button>
         </div>
 
@@ -184,28 +224,37 @@ export function Dashboard() {
               <RechargeCardSkeleton key={i} />
             ))}
           </div>
-        ) : items.length === 0 ? (
+        ) : loadError ? (
+          <div className="border border-dashed border-line rounded-xl p-10 text-center text-ink-soft text-sm">
+            Couldn&apos;t load your recharges.{" "}
+            <button onClick={load} className="font-semibold underline cursor-pointer">
+              Try again
+            </button>
+          </div>
+        ) : sorted.length === 0 ? (
           <div className="border border-dashed border-line rounded-xl p-10 text-center text-ink-soft text-sm">
             No recharges yet. Add your first one to get reminders before it&apos;s due.
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {items.map((item) => (
+            {sorted.map((item) => (
               <RechargeCard
                 key={item.id}
                 item={item}
                 marking={markingId === item.id}
                 onDone={() => handleMarkDone(item)}
                 onEdit={() => openEdit(item)}
-                onDelete={() => handleDelete(item.id)}
+                onDelete={() => handleDelete(item)}
               />
             ))}
           </div>
         )}
+
+        <Reminders defaultLeadDays={defaultLeadDays} />
       </main>
 
       {modalOpen && (
-        <EditModal
+        <RechargeModal
           initialValues={initialValues}
           isEditing={Boolean(editingId)}
           saving={saving}

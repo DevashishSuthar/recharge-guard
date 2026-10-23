@@ -6,6 +6,7 @@ import { Bell, Check, Loader2, Send, LogOut } from "lucide-react";
 import { SettingsSkeleton } from "@/components/PageSkeletons";
 import { enablePushNotifications } from "@/lib/pushClient";
 import { useToast } from "@/components/Toast";
+import { LEAD_DAY_OPTIONS } from "@/lib/constants";
 
 type Me = {
   email: string;
@@ -20,16 +21,21 @@ export function Settings() {
   const router = useRouter();
   const { showToast } = useToast();
   const [me, setMe] = useState<Me | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [telegramInput, setTelegramInput] = useState("");
   const [telegramSave, setTelegramSave] = useState<SaveState>("idle");
 
   useEffect(() => {
     fetch("/api/me")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.json();
+      })
       .then((data: Me) => {
         setMe(data);
         setTelegramInput(data.telegramChatId ?? "");
-      });
+      })
+      .catch(() => setLoadError(true));
   }, []);
 
   async function saveTelegram() {
@@ -82,7 +88,7 @@ export function Settings() {
     );
     if (result.ok) {
       const r = await fetch("/api/me");
-      setMe(await r.json());
+      if (r.ok) setMe(await r.json());
     }
   }
 
@@ -92,6 +98,16 @@ export function Settings() {
     router.refresh();
   }
 
+  if (loadError) {
+    return (
+      <main className="max-w-160 mx-auto px-4 sm:px-6 pt-9 pb-20 text-sm text-ink-soft">
+        Couldn&apos;t load your settings.{" "}
+        <button onClick={() => window.location.reload()} className="font-semibold underline cursor-pointer">
+          Reload
+        </button>
+      </main>
+    );
+  }
   if (!me) return <SettingsSkeleton />;
 
   return (
@@ -118,6 +134,9 @@ export function Settings() {
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
+                id="telegram-chat-id"
+                aria-label="Telegram chat ID"
+                inputMode="numeric"
                 className="input"
                 placeholder="e.g. 5839201744"
                 value={telegramInput}
@@ -128,7 +147,7 @@ export function Settings() {
                 disabled={telegramSave === "saving"}
                 className={`shrink-0 flex items-center justify-center gap-1.5 transition-colors text-xs font-semibold rounded-md px-3 py-2.5 sm:py-0 min-w-20 ${telegramSave === "saved"
                   ? "bg-teal text-white"
-                  : "bg-brand hover:bg-brand-light text-white disabled:opacity-70 disabled:cursor-wait"
+                  : "bg-brand-strong hover:brightness-110 text-white disabled:opacity-70 disabled:cursor-wait"
                   }`}
               >
                 {telegramSave === "saving" && <Loader2 size={12} className="animate-spin" />}
@@ -146,11 +165,12 @@ export function Settings() {
           <div className="p-4">
             <div className="text-sm text-ink-soft mb-2">Default lead time</div>
             <select
+              aria-label="Default lead time"
               className="input"
               value={me.defaultLeadDays}
               onChange={(e) => saveLeadDays(Number(e.target.value))}
             >
-              {[1, 2, 3, 5, 7].map((d) => (
+              {LEAD_DAY_OPTIONS.map((d) => (
                 <option key={d} value={d}>
                   {d} day{d > 1 ? "s" : ""} before due date
                 </option>

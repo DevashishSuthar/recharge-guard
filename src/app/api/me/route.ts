@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
+import { trackServerEvent } from "@/lib/analyticsServer";
+import { MAX_LEAD_DAYS } from "@/lib/constants";
+import { parseBody, unauthorized, notFound } from "@/lib/http";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const userId = await getSessionUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) {
+    return unauthorized();
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -18,7 +23,9 @@ export async function GET() {
     },
   });
 
-  if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!user) {
+    return notFound();
+  }
 
   return NextResponse.json({
     id: user.id,
@@ -36,22 +43,26 @@ const telegramChatIdSchema = z.preprocess(
 
 const patchSchema = z.object({
   telegramChatId: telegramChatIdSchema.optional(),
-  defaultLeadDays: z.number().int().min(0).max(30).optional(),
+  defaultLeadDays: z.number().int().min(0).max(MAX_LEAD_DAYS).optional(),
 });
 
 export async function PATCH(req: NextRequest) {
   const userId = await getSessionUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) {
+    return unauthorized();
+  }
 
-  const parsed = patchSchema.safeParse(await req.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
+  const body = await parseBody(req, patchSchema);
+  if (!body.ok) {
+    return body.response;
   }
 
   const user = await prisma.user.update({
     where: { id: userId },
-    data: parsed.data,
+    data: body.data,
   });
+
+  if (body.data.telegramChatId) trackServerEvent("telegram_connected", userId);
 
   return NextResponse.json({
     telegramChatId: user.telegramChatId,
