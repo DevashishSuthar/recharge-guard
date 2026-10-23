@@ -19,6 +19,8 @@ model User {
 
   recharges         RechargeItem[]
   pushSubscriptions PushSubscription[]
+  analyticsEvents   AnalyticsEvent[]
+  reminders         Reminder[]
 
   @@map("users")
 }
@@ -63,4 +65,63 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+// First-party, cookieless analytics. `visitorId` is a daily-rotating HMAC of
+// IP + user-agent (the raw IP / UA are never stored), so it can count unique
+// visitors per day but cannot follow anyone across days. `userId` is set when
+// the person is signed in, and becomes NULL if the account is deleted.
+model AnalyticsEvent {
+  id          String   @id @default(cuid())
+  name        String   // page_view, cta_click, signup, login, recharge_created, ...
+  path        String?
+  label       String?  // e.g. which CTA was clicked
+  visitorId   String?
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  referrer    String?  // hostname only
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  country     String?
+  device      String?  // mobile | tablet | desktop
+  createdAt   DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@map("analytics_events")
+}
+
+// A simple day-based note-style reminder ("renew car insurance", "change AC
+// filter"). Same idea as a recharge item, minus provider/amount: one due date,
+// optionally repeating every `repeatDays`. `repeatDays = null` means one-time,
+// and marking it done sets `completedAt`.
+model Reminder {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title           String
+  note            String?
+  dueDate         DateTime
+  repeatDays      Int?
+  leadDays        Int       @default(3)
+  lastNotifiedFor DateTime? // idempotency marker for the daily cron
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([completedAt, dueDate])
+  @@map("reminders")
+}
+
+// Fixed-window counters for login / signup rate limiting (see lib/rateLimit.ts).
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
+
+  @@index([resetAt])
+  @@map("rate_limits")
 }
