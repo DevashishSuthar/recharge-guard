@@ -5,7 +5,7 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-nocheck
 import { defaultCache } from "@serwist/next/worker";
-import { Serwist } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 
 declare global {
@@ -21,7 +21,16 @@ const serwist = new Serwist({
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  runtimeCaching: [
+    // Never cache API responses. The default rule stores GET /api/* for 24h,
+    // so on a shared device the next person could be shown the previous
+    // user's recharges while offline. First match wins, so this goes first.
+    {
+      matcher: ({ sameOrigin, url }) => sameOrigin && url.pathname.startsWith("/api/"),
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
 });
 
 serwist.addEventListeners();
@@ -31,17 +40,18 @@ serwist.addEventListeners();
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 
-  const data = event.data.json() as { title: string; body: string };
+  const data = event.data.json() as { title: string; body: string; url?: string };
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
+      data: { url: data.url ?? "/dashboard" },
     })
   );
 });
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  event.waitUntil(self.clients.openWindow("/dashboard"));
+  event.waitUntil(self.clients.openWindow(event.notification.data?.url ?? "/dashboard"));
 });
