@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Field from "@/components/Field";
 import { Logo } from "@/components/Logo";
+import { trackGA } from "@/lib/analytics";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +33,9 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(mode === "signup" ? "/notifications" : "/dashboard");
+      const isSignup = mode === "signup";
+      trackGA(isSignup ? "sign_up" : "login", { method: "email" });
+      router.push(isSignup ? "/notifications" : "/dashboard");
       router.refresh();
     } catch {
       setError("Network error. Please try again.");
@@ -66,9 +69,11 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="Email">
+            <Field label="Email" htmlFor="email">
               <input
+                id="email"
                 type="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -77,10 +82,12 @@ export default function LoginPage() {
               />
             </Field>
 
-            <Field label="Password">
+            <Field label="Password" htmlFor="password">
               <div className="relative">
                 <input
+                  id="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
                   required
                   minLength={8}
                   value={password}
@@ -112,7 +119,7 @@ export default function LoginPage() {
               //   width: "100%", marginTop: 8, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
               //   color: "#fff", background: COLORS.ink, border: "none", borderRadius: 8, padding: "12px 0", cursor: "pointer"
               // }}
-              className="w-full mt-2 bg-brand hover:bg-brand-light transition-colors text-white font-semibold text-sm border-none rounded-lg py-3 disabled:opacity-60 cursor-pointer"
+              className="w-full mt-2 bg-brand-strong hover:brightness-110 transition text-white font-semibold text-sm border-none rounded-lg py-3 disabled:opacity-60 cursor-pointer"
             >
               {loading ? "Please wait…" : mode === "signup" ? "Create account" : "Log in"}
             </button>

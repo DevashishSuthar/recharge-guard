@@ -2,26 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createSession } from "@/lib/auth";
+import { trackServerEvent } from "@/lib/analyticsServer";
+import { getClientIp, parseBody } from "@/lib/http";
+import { checkRateLimits } from "@/lib/rateLimit";
 
 const schema = z.object({
   email: z.email(),
-  password: z.string().min(8, "Password must be at least 8 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(200),
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const parsed = schema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0].message },
-        { status: 400 }
-      );
+    const limited = await checkRateLimits([
+      { key: `signup:ip:${getClientIp(req)}`, limit: 5, windowSeconds: 60 * 60 },
+    ]);
+    if (limited) {
+      return limited;
     }
 
-    // const { email, password } = parsed.data;
-    const { password } = parsed.data;
-    const email = parsed.data.email.toLowerCase().trim();
+    const body = await parseBody(req, schema);
+    if (!body.ok) {
+      return body.response;
+    }
+
+    const { password } = body.data;
+    const email = body.data.email.toLowerCase().trim();
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {
@@ -36,6 +41,7 @@ export async function POST(req: NextRequest) {
     });
 
     await createSession(user.id);
+    trackServerEvent("signup", user.id);
 
     return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
   } catch (err) {

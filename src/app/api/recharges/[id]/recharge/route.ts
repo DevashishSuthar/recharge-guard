@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
-import { addDays, computeDue, paiseToRupees } from "@/lib/utils";
+import { addDays } from "@/lib/utils";
+import { trackServerEvent } from "@/lib/analyticsServer";
+import { isRecordNotFound, notFound, unauthorized } from "@/lib/http";
+import { serializeRecharge } from "@/lib/serializers";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -15,26 +18,32 @@ type Params = { params: Promise<{ id: string }> };
  */
 export async function POST(_req: NextRequest, { params }: Params) {
   const userId = await getSessionUserId();
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId) {
+    return unauthorized();
+  }
 
   const { id } = await params;
-  const existing = await prisma.rechargeItem.findUnique({ where: { id } });
-  if (!existing || existing.userId !== userId) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const existing = await prisma.rechargeItem.findFirst({ where: { id, userId } });
+  if (!existing) {
+    return notFound();
   }
 
   const now = new Date();
   const currentDue = addDays(existing.lastRecharge, existing.cycleDays);
   const nextStart = currentDue > now ? currentDue : now;
 
-  const updated = await prisma.rechargeItem.update({
-    where: { id },
-    data: { lastRecharge: nextStart, lastNotifiedFor: null },
-  });
+  try {
+    const updated = await prisma.rechargeItem.update({
+      where: { id, userId },
+      data: { lastRecharge: nextStart, lastNotifiedFor: null },
+    });
 
-  return NextResponse.json({
-    ...updated,
-    amount: paiseToRupees(updated.amount),
-    ...computeDue(updated),
-  });
+    trackServerEvent("recharge_marked_done", userId);
+    return NextResponse.json(serializeRecharge(updated));
+  } catch (err) {
+    if (isRecordNotFound(err)) {
+      return notFound();
+    }
+    throw err;
+  }
 }

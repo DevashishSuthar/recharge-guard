@@ -1,11 +1,7 @@
-import { SignJWT, jwtVerify } from "jose";
+import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
-
-const SESSION_COOKIE = "charge_guard_session";
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "dev-only-secret-change-me"
-);
+import { SESSION_COOKIE, getSecret, verifySessionToken } from "@/lib/session";
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 10);
@@ -21,7 +17,7 @@ export async function createSession(userId: string) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("30d")
-    .sign(secret);
+    .sign(getSecret());
 
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
@@ -42,13 +38,8 @@ export async function destroySession() {
 export async function getSessionUserId(): Promise<string | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-
-  try {
-    const { payload } = await jwtVerify(token, secret);
-    return typeof payload.userId === "string" ? payload.userId : null;
-  } catch {
-    // Expired or tampered token — treat as logged out rather than erroring.
+  if (!token) {
     return null;
   }
+  return verifySessionToken(token);
 }
